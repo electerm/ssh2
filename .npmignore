@@ -1,0 +1,10 @@
+/static/
+/bin/
+/.github/
+/temp/
+/examples/
+/test/
+/.eslintignore
+/.eslintrc.js
+/install.js/
+/SFTP.md

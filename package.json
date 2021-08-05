@@ -1,5 +1,5 @@
 {
-  "name": "ssh2",
+  "name": "@electerm/ssh2",
   "version": "1.2.0",
   "author": "Brian White <mscdex@mscdex.net>",
   "description": "SSH2 client and server modules written in pure JavaScript for node.js",
@@ -15,13 +15,11 @@
     "@mscdex/eslint-config": "^1.0.0",
     "eslint": "^7.0.0"
   },
-  "optionalDependencies": {
+  "peerDependencies": {
     "cpu-features": "0.0.2",
     "nan": "^2.14.2"
   },
   "scripts": {
-    "install": "node install.js",
-    "rebuild": "node install.js",
     "test": "node test/test.js",
     "lint": "eslint --cache --report-unused-disable-directives --ext=.js .eslintrc.js examples lib test",
     "lint:fix": "npm run lint -- --fix"
