@@ -1,6 +1,6 @@
 {
   "name": "@electerm/ssh2",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": "Brian White <mscdex@mscdex.net>",
   "description": "SSH2 client and server modules written in pure JavaScript for node.js",
   "main": "./lib/index.js",
@@ -20,6 +20,8 @@
     "nan": "^2.14.2"
   },
   "scripts": {
+    "install": "node install.js",
+    "rebuild": "node install.js",
     "test": "node test/test.js",
     "lint": "eslint --cache --report-unused-disable-directives --ext=.js .eslintrc.js examples lib test",
     "lint:fix": "npm run lint -- --fix"
