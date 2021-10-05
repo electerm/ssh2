@@ -258,7 +258,7 @@ SFTP methods
 
     `options` can include `start` and `end` values to read a range of bytes from the file instead of the entire file. Both `start` and `end` are inclusive and start at 0. The `encoding` can be `'utf8'`, `'ascii'`, or `'base64'`.
 
-    If `autoClose` is false, then the file handle won't be closed, even if there's an error. It is your responsiblity to close it and make sure there's no file handle leak. If `autoClose` is set to true (default behavior), on `error` or `end` the file handle will be closed automatically.
+    If `autoClose` is false, then the file handle won't be closed, even if there's an error. It is your responsibility to close it and make sure there's no file handle leak. If `autoClose` is set to true (default behavior), on `error` or `end` the file handle will be closed automatically.
 
     An example to read the last 10 bytes of a file which is 100 bytes long:
 
@@ -338,6 +338,10 @@ SFTP methods
 * **ext_openssh_hardlink**(< _string_ >targetPath, < _string_ >linkPath, < _function_ >callback) - _(void)_ - **OpenSSH extension** Performs POSIX link(2) to create a hard link to `targetPath` at `linkPath`. `callback` has 1 parameter: < _Error_ >err.
 
 * **ext_openssh_fsync**(< _Buffer_ >handle, < _function_ >callback) - _(void)_ - **OpenSSH extension** Performs POSIX fsync(3) on the open handle `handle`. `callback` has 1 parameter: < _Error_ >err.
+
+* **ext_openssh_lsetstat**(< _string_ >path, < _ATTRS_ >attributes, < _function_ >callback) - _(void)_ - **OpenSSH extension** Similar to `setstat()`, but instead sets attributes on symlinks. `callback` has 1 parameter: < _Error_ >err.
+
+* **ext_openssh_expandPath**(< _string_ >path, < _function_ >callback) - _(void)_ - **OpenSSH extension** Similar to `realpath()`, but supports tilde-expansion, i.e. "\~", "\~/..." and "\~user/...". These paths are expanded using shell-like rules. `callback` has 2 parameters: < _Error_ >err, < _string_ >absPath.
 
 
 **Server-only methods**

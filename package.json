@@ -1,6 +1,6 @@
 {
   "name": "@electerm/ssh2",
-  "version": "1.2.1",
+  "version": "1.4.0",
   "author": "Brian White <mscdex@mscdex.net>",
   "description": "SSH2 client and server modules written in pure JavaScript for node.js",
   "main": "./lib/index.js",
@@ -17,7 +17,7 @@
   },
   "peerDependencies": {
     "cpu-features": "0.0.2",
-    "nan": "^2.14.2"
+    "nan": "^2.15.0"
   },
   "scripts": {
     "install": "node install.js",
