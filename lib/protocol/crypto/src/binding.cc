@@ -1,10 +1,20 @@
+#if defined(__GNUC__) && __GNUC__ >= 8
+#define DISABLE_WCAST_FUNCTION_TYPE _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wcast-function-type\"")
+#define DISABLE_WCAST_FUNCTION_TYPE_END _Pragma("GCC diagnostic pop")
+#else
+#define DISABLE_WCAST_FUNCTION_TYPE
+#define DISABLE_WCAST_FUNCTION_TYPE_END
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
 
 #include <node.h>
 #include <node_buffer.h>
+DISABLE_WCAST_FUNCTION_TYPE
 #include <nan.h>
+DISABLE_WCAST_FUNCTION_TYPE_END
 
 #if NODE_MAJOR_VERSION >= 17
 #  include <openssl/configuration.h>
@@ -252,6 +262,8 @@ out:
 
     // Poly1305 over ciphertext
 #if REAL_OPENSSL_MAJOR >= 3
+    // TODO: check if dup()'ing a "base" context instead of calling init() with
+    //       the key each time is faster
     if (EVP_MAC_init(mac_ctx_, polykey, sizeof(polykey), nullptr) != 1
         || EVP_MAC_update(mac_ctx_, packet, data_len) != 1
         || EVP_MAC_final(mac_ctx_, packet + data_len, &sig_len, sig_len) != 1) {
@@ -452,11 +464,6 @@ class AESGCMCipher : public ObjectWrap {
       goto out;
     }
 
-    //~ if (iv_len != static_cast<size_t>(ctx_iv_len(ctx_))) {
-      //~ r = kErrBadIVLen;
-      //~ goto out;
-    //~ }
-
     if (key_len != static_cast<size_t>(ctx_key_len(ctx_))) {
       if (!EVP_CIPHER_CTX_set_key_length(ctx_, key_len)) {
         r = kErrBadKeyLen;
@@ -654,7 +661,12 @@ class GenericCipher : public ObjectWrap {
  private:
   explicit GenericCipher()
     : ctx_(nullptr),
+#if REAL_OPENSSL_MAJOR >= 3
+      mac_(nullptr),
+      mac_ctx_base_(nullptr),
+#else
       ctx_hmac_(nullptr),
+#endif
       hmac_len_(0),
       is_etm_(0) {}
 
@@ -667,10 +679,21 @@ class GenericCipher : public ObjectWrap {
       EVP_CIPHER_CTX_free(ctx_);
       ctx_ = nullptr;
     }
+#if REAL_OPENSSL_MAJOR >= 3
+    if (mac_ctx_base_) {
+      EVP_MAC_CTX_free(mac_ctx_base_);
+      mac_ctx_base_ = nullptr;
+    }
+    if (mac_) {
+      EVP_MAC_free(mac_);
+      mac_ = nullptr;
+    }
+#else
     if (ctx_hmac_) {
       HMAC_CTX_free(ctx_hmac_);
       ctx_hmac_ = nullptr;
     }
+#endif
   }
 
   ErrorType init(const char* name,
@@ -684,7 +707,11 @@ class GenericCipher : public ObjectWrap {
                  int is_etm) {
     ErrorType r = kErrNone;
 
+#if REAL_OPENSSL_MAJOR >= 3
+    OSSL_PARAM params[2];
+#else
     const EVP_MD* md;
+#endif
     const EVP_CIPHER* const cipher = EVP_get_cipherbyname(name);
     if (cipher == nullptr) {
       r = kErrOpenSSL;
@@ -742,6 +769,28 @@ class GenericCipher : public ObjectWrap {
       }
     }
 
+#if REAL_OPENSSL_MAJOR >= 3
+    if ((mac_ = EVP_MAC_fetch(nullptr,
+                              "HMAC",
+                              "provider=default")) == nullptr) {
+      r = kErrOpenSSL;
+      goto out;
+    }
+    if ((mac_ctx_base_ = EVP_MAC_CTX_new(mac_)) == nullptr) {
+      r = kErrOpenSSL;
+      goto out;
+    }
+    params[0] = OSSL_PARAM_construct_utf8_string("digest",
+                                                 const_cast<char*>(hmac_name),
+                                                 0);
+    params[1] = OSSL_PARAM_END;
+    if (EVP_MAC_init(mac_ctx_base_, hmac_key, hmac_key_len, params) != 1) {
+      EVP_MAC_CTX_free(mac_ctx_base_);
+      r = kErrOpenSSL;
+      goto out;
+    }
+    hmac_len_ = EVP_MAC_CTX_get_mac_size(mac_ctx_base_);
+#else
     md = EVP_get_digestbyname(hmac_name);
     if (md == nullptr) {
       r = kErrBadHMACName;
@@ -755,6 +804,7 @@ class GenericCipher : public ObjectWrap {
     }
 
     hmac_len_ = HMAC_size(ctx_hmac_);
+#endif
     is_etm_ = is_etm;
 
 out:
@@ -792,39 +842,51 @@ out:
         r = kErrPartialEncrypt;
         goto out;
       }
+    }
 
-      // HMAC over unencrypted packet length and ciphertext
-      {
-        unsigned int outlen = hmac_len_;
-        if (HMAC_Init_ex(ctx_hmac_, nullptr, 0, nullptr, nullptr) != 1
-            || HMAC_Update(ctx_hmac_, seqbuf, sizeof(seqbuf)) != 1
-            || HMAC_Update(ctx_hmac_, packet, data_len) != 1
-            || HMAC_Final(ctx_hmac_, packet + data_len, &outlen) != 1) {
-          r = kErrOpenSSL;
-          goto out;
-        }
-        if (outlen != hmac_len_) {
-          r = kErrBadHMACLen;
-          goto out;
-        }
-      }
-    } else {
-      // HMAC over plaintext
-      {
-        unsigned int outlen = hmac_len_;
-        if (HMAC_Init_ex(ctx_hmac_, nullptr, 0, nullptr, nullptr) != 1
-            || HMAC_Update(ctx_hmac_, seqbuf, sizeof(seqbuf)) != 1
-            || HMAC_Update(ctx_hmac_, packet, data_len) != 1
-            || HMAC_Final(ctx_hmac_, packet + data_len, &outlen) != 1) {
-          r = kErrOpenSSL;
-          goto out;
-        }
-        if (outlen != hmac_len_) {
-          r = kErrBadHMACLen;
-          goto out;
-        }
-      }
+    // Calculate HMAC
+    {
+#if REAL_OPENSSL_MAJOR >= 3
+      size_t outlen = hmac_len_;
 
+      EVP_MAC_CTX* mac_ctx = EVP_MAC_CTX_dup(mac_ctx_base_);
+      if (mac_ctx == nullptr) {
+        r = kErrOpenSSL;
+        goto out;
+      }
+      if (EVP_MAC_update(mac_ctx, seqbuf, sizeof(seqbuf)) != 1
+          || EVP_MAC_update(mac_ctx, packet, data_len) != 1
+          || EVP_MAC_final(mac_ctx,
+                           packet + data_len,
+                           reinterpret_cast<size_t*>(&outlen),
+                           outlen) != 1) {
+        EVP_MAC_CTX_free(mac_ctx);
+        r = kErrOpenSSL;
+        goto out;
+      }
+      if (outlen != hmac_len_) {
+        EVP_MAC_CTX_free(mac_ctx);
+        r = kErrBadHMACLen;
+        goto out;
+      }
+      EVP_MAC_CTX_free(mac_ctx);
+#else
+      unsigned int outlen = hmac_len_;
+      if (HMAC_Init_ex(ctx_hmac_, nullptr, 0, nullptr, nullptr) != 1
+          || HMAC_Update(ctx_hmac_, seqbuf, sizeof(seqbuf)) != 1
+          || HMAC_Update(ctx_hmac_, packet, data_len) != 1
+          || HMAC_Final(ctx_hmac_, packet + data_len, &outlen) != 1) {
+        r = kErrOpenSSL;
+        goto out;
+      }
+      if (outlen != hmac_len_) {
+        r = kErrBadHMACLen;
+        goto out;
+      }
+#endif
+    }
+
+    if (!is_etm_) {
       // Encrypt packet
       if (EVP_EncryptUpdate(ctx_,
                             packet,
@@ -958,8 +1020,14 @@ out:
   }
 
   EVP_CIPHER_CTX* ctx_;
+#if REAL_OPENSSL_MAJOR >= 3
+  EVP_MAC* mac_;
+  EVP_MAC_CTX* mac_ctx_base_;
+  size_t hmac_len_;
+#else
   HMAC_CTX* ctx_hmac_;
   unsigned int hmac_len_;
+#endif
   int is_etm_;
 };
 
@@ -1163,6 +1231,8 @@ out:
 
     // Poly1305 over ciphertext
 #if REAL_OPENSSL_MAJOR >= 3
+    // TODO: check if dup()'ing a "base" context instead of calling init() with
+    //       the key each time is faster
     if (EVP_MAC_init(mac_ctx_, polykey, sizeof(polykey), nullptr) != 1
         || EVP_MAC_update(mac_ctx_, length_bytes, sizeof(length_bytes)) != 1
         || EVP_MAC_update(mac_ctx_, packet, packet_len) != 1
@@ -1448,11 +1518,6 @@ class AESGCMDecipher : public ObjectWrap {
       goto out;
     }
 
-    //~ if (iv_len != static_cast<size_t>(ctx_iv_len(ctx_))) {
-      //~ r = kErrBadIVLen;
-      //~ goto out;
-    //~ }
-
     if (key_len != static_cast<size_t>(ctx_key_len(ctx_))) {
       if (!EVP_CIPHER_CTX_set_key_length(ctx_, key_len)) {
         r = kErrBadKeyLen;
@@ -1661,7 +1726,12 @@ class GenericDecipher : public ObjectWrap {
  private:
   explicit GenericDecipher()
     : ctx_(nullptr),
+#if REAL_OPENSSL_MAJOR >= 3
+      mac_(nullptr),
+      mac_ctx_base_(nullptr),
+#else
       ctx_hmac_(nullptr),
+#endif
       hmac_len_(0),
       is_etm_(0) {}
 
@@ -1674,10 +1744,21 @@ class GenericDecipher : public ObjectWrap {
       EVP_CIPHER_CTX_free(ctx_);
       ctx_ = nullptr;
     }
+#if REAL_OPENSSL_MAJOR >= 3
+    if (mac_ctx_base_) {
+      EVP_MAC_CTX_free(mac_ctx_base_);
+      mac_ctx_base_ = nullptr;
+    }
+    if (mac_) {
+      EVP_MAC_free(mac_);
+      mac_ = nullptr;
+    }
+#else
     if (ctx_hmac_) {
       HMAC_CTX_free(ctx_hmac_);
       ctx_hmac_ = nullptr;
     }
+#endif
   }
 
   ErrorType init(const char* name,
@@ -1692,7 +1773,11 @@ class GenericDecipher : public ObjectWrap {
                  size_t hmac_actual_len) {
     ErrorType r = kErrNone;
 
+#if REAL_OPENSSL_MAJOR >= 3
+    OSSL_PARAM params[2];
+#else
     const EVP_MD* md;
+#endif
     const EVP_CIPHER* const cipher = EVP_get_cipherbyname(name);
     if (cipher == nullptr) {
       r = kErrOpenSSL;
@@ -1750,6 +1835,28 @@ class GenericDecipher : public ObjectWrap {
       }
     }
 
+#if REAL_OPENSSL_MAJOR >= 3
+    if ((mac_ = EVP_MAC_fetch(nullptr,
+                              "HMAC",
+                              "provider=default")) == nullptr) {
+      r = kErrOpenSSL;
+      goto out;
+    }
+    if ((mac_ctx_base_ = EVP_MAC_CTX_new(mac_)) == nullptr) {
+      r = kErrOpenSSL;
+      goto out;
+    }
+    params[0] = OSSL_PARAM_construct_utf8_string("digest",
+                                                 const_cast<char*>(hmac_name),
+                                                 0);
+    params[1] = OSSL_PARAM_END;
+    if (EVP_MAC_init(mac_ctx_base_, hmac_key, hmac_key_len, params) != 1) {
+      EVP_MAC_CTX_free(mac_ctx_base_);
+      r = kErrOpenSSL;
+      goto out;
+    }
+    hmac_len_ = EVP_MAC_CTX_get_mac_size(mac_ctx_base_);
+#else
     md = EVP_get_digestbyname(hmac_name);
     if (md == nullptr) {
       r = kErrBadHMACName;
@@ -1763,6 +1870,7 @@ class GenericDecipher : public ObjectWrap {
     }
 
     hmac_len_ = HMAC_size(ctx_hmac_);
+#endif
     hmac_actual_len_ = hmac_actual_len;
     is_etm_ = is_etm;
 #if REAL_OPENSSL_MAJOR >= 3
@@ -1825,47 +1933,7 @@ out:
     ((uint8_t*)(seqbuf))[2] = (seqno >> 8) & 0xff;
     ((uint8_t*)(seqbuf))[3] = seqno & 0xff;
 
-    if (is_etm_) {
-      // `first_block` for ETM should just be the unencrypted packet length
-      if (first_block_len != 4) {
-        r = kErrBadBlockLen;
-        goto out;
-      }
-
-      // HMAC over unencrypted packet length and ciphertext
-      {
-        unsigned int outlen = hmac_len_;
-        if (HMAC_Init_ex(ctx_hmac_, nullptr, 0, nullptr, nullptr) != 1
-            || HMAC_Update(ctx_hmac_, seqbuf, sizeof(seqbuf)) != 1
-            || HMAC_Update(ctx_hmac_, first_block, 4) != 1
-            || HMAC_Update(ctx_hmac_, packet, packet_len) != 1
-            || HMAC_Final(ctx_hmac_, calc_mac, &outlen) != 1) {
-          r = kErrOpenSSL;
-          goto out;
-        }
-
-        if (outlen != hmac_len_ || mac_len != hmac_len_) {
-          r = kErrBadHMACLen;
-          goto out;
-        }
-
-        // Compare MACs
-        if (CRYPTO_memcmp(mac, calc_mac, hmac_len_)) {
-          r = kErrInvalidMAC;
-          goto out;
-        }
-      }
-
-      // Decrypt packet
-      if (EVP_DecryptUpdate(ctx_, packet, &outlen, packet, packet_len) != 1) {
-        r = kErrOpenSSL;
-        goto out;
-      }
-      if (static_cast<size_t>(outlen) != packet_len) {
-        r = kErrPartialDecrypt;
-        goto out;
-      }
-    } else {
+    if (!is_etm_) {
       // `first_block` for non-ETM should be a completely decrypted first block
       if (!is_stream_ && first_block_len != block_size_) {
         r = kErrBadBlockLen;
@@ -1886,29 +1954,73 @@ out:
         r = kErrPartialDecrypt;
         goto out;
       }
+    }
 
-      // HMAC over plaintext
-      {
-        unsigned int outlen = hmac_len_;
-        if (HMAC_Init_ex(ctx_hmac_, nullptr, 0, nullptr, nullptr) != 1
-            || HMAC_Update(ctx_hmac_, seqbuf, sizeof(seqbuf)) != 1
-            || HMAC_Update(ctx_hmac_, first_block, 4) != 1
-            || HMAC_Update(ctx_hmac_, packet, packet_len) != 1
-            || HMAC_Final(ctx_hmac_, calc_mac, &outlen) != 1) {
-          r = kErrOpenSSL;
-          goto out;
-        }
+    // Calculate and compare HMAC
+    {
+#if REAL_OPENSSL_MAJOR >= 3
+      size_t outlen = hmac_len_;
 
-        if (outlen != hmac_len_ || mac_len != hmac_actual_len_) {
-          r = kErrBadHMACLen;
-          goto out;
-        }
+      EVP_MAC_CTX* mac_ctx = EVP_MAC_CTX_dup(mac_ctx_base_);
+      if (mac_ctx == nullptr) {
+        r = kErrOpenSSL;
+        goto out;
+      }
+      if (EVP_MAC_update(mac_ctx, seqbuf, sizeof(seqbuf)) != 1
+          || EVP_MAC_update(mac_ctx, first_block, 4) != 1
+          || EVP_MAC_update(mac_ctx, packet, packet_len) != 1
+          || EVP_MAC_final(mac_ctx,
+                           calc_mac,
+                           &outlen,
+                           outlen) != 1) {
+        EVP_MAC_CTX_free(mac_ctx);
+        r = kErrOpenSSL;
+        goto out;
+      }
+      if (outlen != hmac_len_ || mac_len != hmac_actual_len_) {
+        EVP_MAC_CTX_free(mac_ctx);
+        r = kErrBadHMACLen;
+        goto out;
+      }
+      EVP_MAC_CTX_free(mac_ctx);
+#else
+      unsigned int outlen = hmac_len_;
+      if (HMAC_Init_ex(ctx_hmac_, nullptr, 0, nullptr, nullptr) != 1
+          || HMAC_Update(ctx_hmac_, seqbuf, sizeof(seqbuf)) != 1
+          || HMAC_Update(ctx_hmac_, first_block, 4) != 1
+          || HMAC_Update(ctx_hmac_, packet, packet_len) != 1
+          || HMAC_Final(ctx_hmac_, calc_mac, &outlen) != 1) {
+        r = kErrOpenSSL;
+        goto out;
+      }
+      if (outlen != hmac_len_ || mac_len != hmac_actual_len_) {
+        r = kErrBadHMACLen;
+        goto out;
+      }
+#endif
 
-        // Compare MACs
-        if (CRYPTO_memcmp(mac, calc_mac, hmac_actual_len_)) {
-          r = kErrInvalidMAC;
-          goto out;
-        }
+      // Compare MACs
+      if (CRYPTO_memcmp(mac, calc_mac, hmac_actual_len_)) {
+        r = kErrInvalidMAC;
+        goto out;
+      }
+    }
+
+    if (is_etm_) {
+      // `first_block` for ETM should just be the unencrypted packet length
+      if (first_block_len != 4) {
+        r = kErrBadBlockLen;
+        goto out;
+      }
+
+      // Decrypt packet
+      if (EVP_DecryptUpdate(ctx_, packet, &outlen, packet, packet_len) != 1) {
+        r = kErrOpenSSL;
+        goto out;
+      }
+      if (static_cast<size_t>(outlen) != packet_len) {
+        r = kErrPartialDecrypt;
+        goto out;
       }
     }
 
@@ -2077,8 +2189,14 @@ out:
   }
 
   EVP_CIPHER_CTX* ctx_;
+#if REAL_OPENSSL_MAJOR >= 3
+  EVP_MAC* mac_;
+  EVP_MAC_CTX* mac_ctx_base_;
+  size_t hmac_len_;
+#else
   HMAC_CTX* ctx_hmac_;
   unsigned int hmac_len_;
+#endif
   unsigned int hmac_actual_len_;
   uint8_t is_etm_;
   uint8_t is_stream_;
@@ -2145,4 +2263,6 @@ NAN_MODULE_INIT(init) {
   GenericDecipher::Init(target);
 }
 
+DISABLE_WCAST_FUNCTION_TYPE
 NODE_MODULE(sshcrypto, init)
+DISABLE_WCAST_FUNCTION_TYPE_END
