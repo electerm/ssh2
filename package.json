@@ -1,6 +1,6 @@
 {
   "name": "@electerm/ssh2",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "author": "Brian White <mscdex@mscdex.net>",
   "description": "SSH2 client and server modules written in pure JavaScript for node.js",
   "main": "./lib/index.js",
@@ -12,7 +12,7 @@
     "bcrypt-pbkdf": "^1.0.2"
   },
   "devDependencies": {
-    "@mscdex/eslint-config": "^1.0.0",
+    "@mscdex/eslint-config": "^1.1.0",
     "eslint": "^7.0.0"
   },
   "scripts": {
