@@ -13,7 +13,8 @@
   },
   "devDependencies": {
     "@mscdex/eslint-config": "^1.1.0",
-    "eslint": "^7.0.0"
+    "eslint": "^7.0.0",
+    "nan": "^2.16.0"
   },
   "scripts": {
     "install": "node install.js",
