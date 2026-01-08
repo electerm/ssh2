@@ -374,8 +374,7 @@ test('Integration Test - Full Certificate Flow', async (t) => {
           'hmac-sha1-etm@openssh.com'
         ],
         compress: [ 'zlib@openssh.com', 'zlib', 'none' ]
-      },
-      agent: process.env.SSH_AUTH_SOCK,
+      }
     });
   });
 });
