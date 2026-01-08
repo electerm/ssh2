@@ -375,7 +375,7 @@ test('Integration Test - Full Certificate Flow', async (t) => {
         ],
         compress: [ 'zlib@openssh.com', 'zlib', 'none' ]
       },
-      agent: '/private/tmp/com.apple.launchd.N30iMKbjUF/Listeners',
+      agent: process.env.SSH_AUTH_SOCK,
     });
   });
 });
