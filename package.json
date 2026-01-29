@@ -1,6 +1,6 @@
 {
   "name": "@electerm/ssh2",
-  "version": "1.17.1",
+  "version": "1.17.2",
   "author": "Brian White <mscdex@mscdex.net>",
   "description": "SSH2 client and server modules written in pure JavaScript for node.js",
   "main": "./lib/index.js",
