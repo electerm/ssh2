@@ -115,7 +115,7 @@ test('SFTP GBK Charset Subfolder Handling', async (t) => {
       port: TEST_PORT,
       username: TEST_USERNAME,
       privateKey,
-      sftpEncoding: 'gbk',
+      encode: 'gbk',
       readyTimeout: 5000,
     });
   });

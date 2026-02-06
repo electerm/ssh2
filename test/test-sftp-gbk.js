@@ -80,7 +80,7 @@ done();
       port: TEST_PORT,
       username: TEST_USERNAME,
       privateKey,
-      sftpEncoding: 'gbk',
+      encode: 'gbk',
       readyTimeout: 5000,
     });
   });
@@ -163,7 +163,7 @@ done();
       port: TEST_PORT,
       username: TEST_USERNAME,
       privateKey,
-      sftpEncoding: 'gbk',
+      encode: 'gbk',
       readyTimeout: 5000,
     });
   });
@@ -244,7 +244,7 @@ done();
       port: TEST_PORT,
       username: TEST_USERNAME,
       privateKey,
-      sftpEncoding: 'gbk',
+      encode: 'gbk',
       readyTimeout: 5000,
     });
   });
