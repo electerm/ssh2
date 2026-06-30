@@ -1232,6 +1232,7 @@ const setup = setupSimple.bind(undefined, debug);
       'aes128-ctr',
       'aes192-ctr',
       'aes256-ctr',
+      ...(require('../lib/protocol/constants.js').DEFAULT_CIPHER.includes('sm4-ctr') ? ['sm4-ctr'] : []),
       'aes128-gcm@openssh.com',
       'aes256-gcm@openssh.com',
       'aes128-gcm',

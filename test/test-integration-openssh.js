@@ -64,6 +64,10 @@ for (const file of readdirSync(FIXTURES_DIR, { withFileTypes: true })) {
   console.log(`Testing with OpenSSH version: ${opensshVer}`);
 }
 
+const opensshMajorVer = parseInt(opensshVer.split('.')[0], 10);
+// OpenSSH 10.0+ removed DSS/DSA support entirely
+const opensshSupportsDss = opensshMajorVer < 10;
+
 
 // Key-based authentication
 [
@@ -72,11 +76,16 @@ for (const file of readdirSync(FIXTURES_DIR, { withFileTypes: true })) {
   { desc: 'RSA user key (new OpenSSH)',
     clientKey: fixtureKey('openssh_new_rsa') },
   { desc: 'DSA user key',
-    clientKey: fixtureKey('id_dsa') },
+    clientKey: fixtureKey('id_dsa'),
+    requiresDss: true },
   { desc: 'ECDSA user key',
     clientKey: fixtureKey('id_ecdsa') },
 ].forEach((test) => {
-  const { desc, clientKey } = test;
+  const { desc, clientKey, requiresDss } = test;
+  if (requiresDss && !opensshSupportsDss) {
+    console.log(`  Skipping "${desc}" (OpenSSH ${opensshVer} removed DSS/DSA support)`);
+    return;
+  }
   const username = 'KeyUser';
   const { server } = setup(
     desc,
@@ -144,13 +153,18 @@ for (const file of readdirSync(FIXTURES_DIR, { withFileTypes: true })) {
   { desc: 'RSA host key (new OpenSSH)',
     hostKey: fixture('openssh_new_rsa') },
   { desc: 'DSA host key',
-    hostKey: fixture('ssh_host_dsa_key') },
+    hostKey: fixture('ssh_host_dsa_key'),
+    requiresDss: true },
   { desc: 'ECDSA host key',
     hostKey: fixture('ssh_host_ecdsa_key') },
   { desc: 'PPK',
     hostKey: fixture('id_rsa.ppk') },
 ].forEach((test) => {
-  const { desc, hostKey } = test;
+  const { desc, hostKey, requiresDss } = test;
+  if (requiresDss && !opensshSupportsDss) {
+    console.log(`  Skipping "${desc}" (OpenSSH ${opensshVer} removed DSS/DSA support)`);
+    return;
+  }
   const clientKey = fixtureKey('openssh_new_rsa');
   const username = 'KeyUser';
   const { server } = setup(
@@ -435,8 +449,8 @@ function setup(title, configs) {
       if (clientCfg.privateKeyPath)
         args.push('-o', `IdentityFile=${clientCfg.privateKeyPath}`);
 
-      if (!/^[0-6]\./.test(opensshVer)) {
-        // OpenSSH 7.0+ disables DSS/DSA host (and user) key support by
+      if (!/^[0-6]\./.test(opensshVer) && opensshSupportsDss) {
+        // OpenSSH 7.x-9.x disables DSS/DSA host (and user) key support by
         // default, so we explicitly enable it here
         args.push('-o', 'HostKeyAlgorithms=+ssh-dss');
         args.push('-o', 'PubkeyAcceptedKeyTypes=+ssh-dss');
