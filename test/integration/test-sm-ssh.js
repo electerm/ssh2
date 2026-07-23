@@ -9,7 +9,7 @@
 //
 // Prerequisites:
 //   - Node.js >= 16 with OpenSSL 1.1.1+ (for SM2/SM3/SM4 support)
-//   - The ssh2 library must be built (node install.js)
+//   - No build step required (ssh2 is pure JavaScript)
 
 const { Client, Server } = require('../../lib/index.js');
 const { parseKey } = require('../../lib/protocol/keyParser.js');

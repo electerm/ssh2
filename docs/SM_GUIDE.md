@@ -18,7 +18,7 @@ The ssh2 library now supports the following Chinese national cryptographic algor
 ## Prerequisites
 
 - **Node.js >= 16** with OpenSSL 1.1.1+ (Node.js 18+ recommended for native SM2 support)
-- The ssh2 library must be built: `node install.js`
+- No native compilation required — ssh2 is pure JavaScript
 - **Node.js 16 users**: Install `sm-polyfill` for full SM2 support:
   ```bash
   npm install sm-polyfill
@@ -352,10 +352,7 @@ node -e "console.log('Node:', process.version); console.log('OpenSSL:', process.
 npm install sm-polyfill
 ```
 
-**If on Node.js 18+**: All SM algorithms are natively supported. If you still see this error, ensure the ssh2 library is built:
-```bash
-node install.js
-```
+**If on Node.js 18+**: All SM algorithms are natively supported. If you still see this error, ensure you are using the latest version of ssh2.
 
 ### Using SM3/SM4 on Node.js 16 (Without sm-polyfill)
 

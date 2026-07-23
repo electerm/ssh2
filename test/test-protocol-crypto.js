@@ -6,7 +6,6 @@ const { randomBytes } = require('crypto');
 const {
   CIPHER_INFO,
   MAC_INFO,
-  bindingAvailable,
   NullCipher,
   createCipher,
   NullDecipher,
@@ -17,15 +16,12 @@ const {
 (async () => {
   await cryptoInit;
 
-  console.log(`Crypto binding ${bindingAvailable ? '' : 'not '}available`);
+  console.log('Using pure JS crypto implementation');
   {
     const PAIRS = [
       // cipher, decipher
       ['native', 'native'],
-      ['binding', 'native'],
-      ['native', 'binding'],
-      ['binding', 'binding'],
-    ].slice(0, bindingAvailable ? 4 : 1);
+    ];
 
     [
       { cipher: null },
@@ -106,7 +102,6 @@ const {
               seqno: 1,
               macInfo,
               macKey: (macKey && Buffer.from(macKey)),
-              forceNative: (pair[0] === 'native'),
             },
             inbound: {
               onPayload: onDecipherPayload,
@@ -116,7 +111,6 @@ const {
               seqno: 1,
               macInfo,
               macKey: (macKey && Buffer.from(macKey)),
-              forceNative: (pair[1] === 'native'),
             },
           };
           try {
@@ -144,14 +138,8 @@ const {
             throw ex;
           }
 
-          if (pair[0] === 'binding')
-            assert(/binding/i.test(cipher.constructor.name));
-          else
-            assert(/native/i.test(cipher.constructor.name));
-          if (pair[1] === 'binding')
-            assert(/binding/i.test(decipher.constructor.name));
-          else
-            assert(/native/i.test(decipher.constructor.name));
+          assert(/native/i.test(cipher.constructor.name));
+          assert(/native/i.test(decipher.constructor.name));
         }
 
         let expectedSeqno;

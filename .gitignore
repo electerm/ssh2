@@ -106,6 +106,3 @@ dist
 
 # custom
 /temp/
-
-lib/protocol/crypto/build
-package-lock.json
