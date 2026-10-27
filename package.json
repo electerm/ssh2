@@ -38,11 +38,11 @@
   "licenses": [
     {
       "type": "MIT",
-      "url": "http://github.com/mscdex/ssh2/raw/master/LICENSE"
+      "url": "http://github.com/electerm/ssh2/raw/master/LICENSE"
     }
   ],
   "repository": {
     "type": "git",
-    "url": "http://github.com/mscdex/ssh2.git"
+    "url": "http://github.com/electerm/ssh2.git"
   }
 }
