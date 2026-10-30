@@ -1,0 +1,7 @@
+{
+  "type": "sk-ssh-ed25519@openssh.com",
+  "comment": "testing",
+  "public": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAsjjBrbNFmgHboPTXl2xp9ia7eMMIjuuHbpsVdmtSICk=\n-----END PUBLIC KEY-----",
+  "publicSSH": "AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAILI4wa2zRZoB26D015dsafYmu3jDCI7rh26bFXZrUiApAAAABHNzaDo=",
+  "private": null
+}

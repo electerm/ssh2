@@ -1,0 +1,7 @@
+{
+  "type": "ecdsa-sha2-nistp256",
+  "comment": "testing",
+  "public": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEp5rrWqfouUiYX5Qz9ibCob4Foa7S\nYLOdYW2mzB52lB7D7lEbQ+U3YH3YIE0V9rBZ3uEyyy4xXOoTuGBkL0SUfA==\n-----END PUBLIC KEY-----",
+  "publicSSH": "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBKea61qn6LlImF+UM/YmwqG+BaGu0mCznWFtpswedpQew+5RG0PlN2B92CBNFfawWd7hMssuMVzqE7hgZC9ElHw=",
+  "private": null
+}

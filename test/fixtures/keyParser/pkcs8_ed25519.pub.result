@@ -1,0 +1,7 @@
+{
+  "type": "ssh-ed25519",
+  "comment": "testing",
+  "public": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA7smQhZk/VLHpHffl7R5qmlBplkWj5/37BSb6cDVKkMM=\n-----END PUBLIC KEY-----",
+  "publicSSH": "AAAAC3NzaC1lZDI1NTE5AAAAIO7JkIWZP1Sx6R335e0eappQaZZFo+f9+wUm+nA1SpDD",
+  "private": null
+}
