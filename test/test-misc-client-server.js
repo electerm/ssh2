@@ -36,6 +36,32 @@ const setup = setupSimple.bind(undefined, debug);
 
 
 {
+  const interval = 50;
+  let authenticated = false;
+  const { client, server } = setup_('Keepalive waits for authentication', {
+    client: { ...clientCfg, keepaliveInterval: interval },
+    server: {
+      ...serverCfg,
+      debug(msg) {
+        if (msg.includes('Inbound: GLOBAL_REQUEST (keepalive@openssh.com)')) {
+          assert(authenticated, 'Received a keepalive before authentication');
+          client.end();
+        }
+      },
+    },
+  });
+
+  client.once('ready', () => { authenticated = true; });
+  server.on('connection', (conn) => {
+    conn.on('authentication', (ctx) => {
+      if (ctx.method !== 'password')
+        return ctx.reject(['password']);
+      setTimeout(() => ctx.accept(), interval * 4);
+    });
+  });
+}
+
+{
   const { server } = setup_(
     'Verify host fingerprint (sync success, hostHash set)',
     {
