@@ -92,4 +92,6 @@ jobs:
         run: npm pack --dry-run
 
       - name: Publish
-        run: npm publish --access public --provenance
+        # Belt and braces: this also compares against the registry and no-ops if
+        # the version appeared between the `check` job and now.
+        run: npx --yes @jsdevtools/npm-publish --access public --provenance
